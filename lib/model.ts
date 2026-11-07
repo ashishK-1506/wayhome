@@ -1,0 +1,17 @@
+export type Mode = 'train' | 'flight' | 'bus' | 'carpool';
+export type Depth = 'quick' | 'thorough' | 'extended';
+export type OfferStatus = 'available' | 'rac' | 'waitlist' | 'request' | 'unknown';
+export interface Terminal { id: string; name: string; cityId: string; }
+export interface Place { id: string; name: string; state: string; aliases: string[]; rail: string[]; airports: string[]; lat: number; lon: number; hub?: boolean; }
+export interface SearchQuery { originId: string; destinationId: string; date: string; passengers: number; modes: Mode[]; depth: Depth; flexibility: 0 | 1 | 2; budget: number | null; maxHours: number; latestArrival?: string | null; availabilityOnly: boolean; }
+export interface Offer { id: string; status: OfferStatus; classCode: string; quota?: string; seats?: number; amount: number | null; currency: string; priceBasis: 'person' | 'party'; partySize?: number; checkedAt: string; expiresAt?: string; bookingUrl?: string; linkType?: 'offer' | 'search'; source: string; openingVerified?: boolean; }
+export interface Service { id: string; mode: Mode; number: string; name: string; from: Terminal; to: Terminal; departAt: string; arriveAt: string; offers: Offer[]; }
+export interface Transfer { fromId: string; toId: string; minutes: number; bufferMinutes: number; cost: number | null; evidence: string; }
+export interface Journey { id: string; services: Service[]; selectedOffers: (Offer | null)[]; durationMinutes: number; knownCost: number; costComplete: boolean; offersOnAllLegs: boolean; transfers: { from: string; to: string; gap: number; required: number | null; known: boolean; tight: boolean; cost: number | null; }[]; feasibility: 'feasible' | 'unverified'; warnings: string[]; }
+export interface EngineResult { journeys: Journey[]; counters: { servicesReceived: number; servicesDeduplicated: number; statesExpanded: number; candidatesGenerated: number; itinerariesEvaluated: number; connectionsEvaluated: number; connectionFeasible: number; availabilityChecked: number; offersOnAllLegs: number; rejected: Record<string, number>; truncated: boolean; }; }
+export interface PlannedQuery { id: string; provider: string; modes: Mode[]; from: string; to: string; date: string; passengers: number; purpose: 'direct' | 'feeder' | 'onward' | 'interhub'; status: 'not_attempted'; }
+export interface SearchPlan { runId: string; createdAt: string; query: SearchQuery; origin: Place; destination: Place; dates: string[]; hubs: string[]; queries: PlannedQuery[]; limits: { maxLegs: number; maxRequests: number; maxCandidates: number; concurrency: number; deadlineSeconds: number; }; proposedQueryCount: number; omittedQueryCount: number; omittedDates: string[]; dateCoverage: { date: string; planned: number; proposed: number; }[]; }
+export interface Capability { id: string; name: string; modes: Mode[]; status: 'setup_required'; message: string; }
+// What the hosting platform reports about connected apps for this site: policy and action names, not sign-in state or provider health.
+export type SiteConnections = { status: 'success'; connectors: { connectorId: string; policy: 'enabled' | 'disabled'; actions: string[] | null; }[]; } | { status: 'request_context_expired' | 'internal_error' | 'binding_unavailable' | 'upstream_error'; };
+export interface SearchRun { status: 'blocked'; plan: SearchPlan; providers: Capability[]; result: EngineResult; sourceQueries: { planned: number; attempted: number; succeeded: number; failed: number; notAttempted: number; }; completedAt: string; coverage: 'not_started'; message: string; }
