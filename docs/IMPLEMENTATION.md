@@ -27,7 +27,7 @@ The search API returns the prepared plan with HTTP 200, `status: blocked`, `cove
 | `lib/planner.mjs`, `lib/planner.d.mts` | Input validation, dates, bounded query planning |
 | `lib/engine.mjs`, `lib/engine.d.mts` | Service deduplication, connection search, capacity and freshness checks, ranking |
 | `lib/provider-status.ts` | Explicit integration block (also the page's initial provider list); no guessed connectors |
-| `lib/api-guard.ts` | Hosted identity requirement and same-origin check for searches |
+| `lib/api-guard.ts` | Hosted identity requirement (skipped on Vercel, which has no sign-in) and same-origin check for searches |
 | `tests/planner.test.mjs` | Deterministic planner and engine assertions |
 | `tests/api.test.mjs` | The real route handlers: identity, origin, input limits, privacy, site status, internal errors |
 | `tests/properties.test.mjs` | Randomized property tests with fixed seeds: planner and engine rules, junk input, malformed records, work-limit fairness, booking links |
@@ -35,8 +35,9 @@ The search API returns the prepared plan with HTTP 200, `status: blocked`, `cove
 | `public/favicon.svg` | Product icon |
 | `README.md`, `START_HERE.md`, `docs/IMPLEMENTATION.md`, `docs/VERIFICATION.md` | Overview and glossary, source-download notes, design record, verification history |
 | `.openai/hosting.json` | Existing private project identity; no plugin declarations |
+| `vercel.json` | Makes Vercel build with `next build`; see the README's Vercel section |
 
-The starter's framework, runtime and connector helpers and its dependency versions are unchanged.
+The starter's framework and runtime helpers are unchanged. Two changes support Vercel, where real Next.js builds and serves the app: `next` and `eslint-config-next` are upgraded from 16.3.4 to 16.4.5, and `lib/connectors.ts` imports `./connector-contract.mts` by its real file name, because Next.js does not map `.mjs` to `.mts` as Vite does.
 
 ## Data and privacy
 
@@ -61,14 +62,14 @@ No database migration or external API account is needed for this phase, and no s
 
 | Outcome | Response |
 |---|---|
-| No hosted identity | 401 with a server-written Sign in with ChatGPT link |
+| No hosted identity (except on Vercel) | 401 with a server-written Sign in with ChatGPT link |
 | Search without a matching `Origin` header | 403 |
 | Body over 16,000 bytes | 413. A body up to 1 MB is read and discarded first, because the local Workers runtime otherwise fails the next request |
 | Unreadable JSON or invalid input | 400 with a message for the user |
 | Valid search | 200 with `status: blocked`, the plan, zero attempted queries and empty results |
 | Unexpected server error | 500 with a generic message; details go to the server log |
 
-`GET /api/capabilities` also requires identity. It returns the provider setup states and a `site` object with what Sites reports about connected apps. Neither endpoint accepts arbitrary URLs, connector identifiers or action names. In local development on localhost the identity check is skipped, and the dev server supplies a mock identity.
+`GET /api/capabilities` also requires identity. It returns the provider setup states and a `site` object with what Sites reports about connected apps. Neither endpoint accepts arbitrary URLs, connector identifiers or action names. In local development on localhost the identity check is skipped, and the dev server supplies a mock identity. On Vercel, which has no ChatGPT sign-in, the identity check is skipped too, so a Vercel deployment is public; searches still need a matching `Origin`.
 
 ## Query planning
 

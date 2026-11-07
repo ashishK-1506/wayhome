@@ -33,13 +33,23 @@ npm test       # planner, engine and API tests, plus randomized property tests w
 node node_modules/typescript/bin/tsc --noEmit --incremental false
 npm run lint
 npm run build
+npx next build # the build Vercel runs; see "Vercel (public demo)" below
 ```
 
 ## Deployment and security
 
-This checkout is managed by Sites. Use its installation, preview, build and source-packaging helpers, and keep the starter's framework scripts and lockfile. Production runs as a Cloudflare Worker from the provided entrypoint and hosting manifest (`.openai/hosting.json`, which holds the project identifier, not credentials; the copy in the public repository has it set to null). No database or provider secrets are configured.
+This checkout is managed by Sites. Use its installation, preview, build and source-packaging helpers, and keep the starter's framework scripts. The lockfile matches the starter's apart from the Next.js upgrade described under Vercel below. Production runs as a Cloudflare Worker from the provided entrypoint and hosting manifest (`.openai/hosting.json`, which holds the project identifier, not credentials; the copy in the public repository has it set to null). No database or provider secrets are configured.
 
 The site is owner-private. Sites signs visitors in with ChatGPT and passes their identity to the app in the `oai-authenticated-user-id` header. The API routes also reject requests without that header, and searches sent from another origin.
+
+### Vercel (public demo)
+
+The Sites build produces a Cloudflare Worker, which Vercel cannot serve, so `vercel.json` makes Vercel build the app with `next build` instead. Two things differ there:
+
+- **The site is public.** Vercel has no ChatGPT sign-in, so when `VERCEL=1` the API skips the identity check and anyone with the link can use the site. The page says "Public demo" instead of "Your private travel desk". Searches must still come from the site itself (a matching `Origin`).
+- **Next.js is the server.** On Sites, Next.js only supplies types and lint rules. On Vercel it runs the site, so `next` is kept at 16.4.5, which fixes the critical advisories in 16.3.4.
+
+Travel-app connections exist only on Sites, so a Vercel deployment can only show search plans.
 
 ## Documentation
 

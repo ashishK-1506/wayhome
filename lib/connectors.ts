@@ -1,4 +1,4 @@
-import { createConnectors } from "./connector-contract.mjs";
+import { createConnectors } from "./connector-contract.mts";
 import { getConnectorBinding } from "./connector-context";
 
 /** Keep invocation context on this request; never cache it across visitors. */
@@ -10,4 +10,4 @@ export type {
   ConnectorResult,
   ConnectorFailureStatus,
   Json,
-} from "./connector-contract.mjs";
+} from "./connector-contract.mts";

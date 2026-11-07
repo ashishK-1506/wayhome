@@ -25,6 +25,7 @@ const date=new Date(Date.now()+86400000).toLocaleDateString('en-CA',{timeZone:'A
 const query={originId:'gurugram',destinationId:'jamalpur',date,passengers:1,modes:['train','flight','bus','carpool'],depth:'extended',flexibility:0,budget:null,maxHours:72,availabilityOnly:true};
 const request=(body,extra={})=>new Request(base+'/api/search',{method:'POST',headers:{'oai-authenticated-user-id':'test-visitor',Origin:base,'Content-Type':'application/json',...extra},body:typeof body==='string'?body:JSON.stringify(body)});
 process.env.NODE_ENV='production';
+delete process.env.VERCEL; // these tests describe Sites; the Vercel test sets VERCEL itself
 
 test('production API rejects absent identity before reading request input',async()=>{for(const r of [await GET(new Request(base+'/api/capabilities')),await POST(new Request(base+'/api/search',{method:'POST',headers:{Origin:base},body:'{}'}))]){assert.equal(r.status,401);const data=await r.json();assert.equal(data.status,'reauthentication_required');assert.match(data.chatGPTSignInPath,/^\/signin-with-chatgpt/);}});
 test('search rejects wrong or missing Origin',async()=>{for(const origin of ['https://other.test',''])assert.equal((await POST(request(query,{Origin:origin}))).status,403);});
@@ -43,4 +44,13 @@ test('internal errors return a generic 500 without leaking details',async()=>{
   const logged=console.error;console.error=()=>{};
   try{const response=await brokenPost(request(query));assert.equal(response.status,500);const data=await response.json();assert.equal(data.status,'error');assert(!JSON.stringify(data).includes('secret'));}
   finally{console.error=logged;}
+});
+test('on Vercel, which has no ChatGPT sign-in, the API is public but searches still need the same origin',async()=>{
+  process.env.VERCEL='1';
+  try{
+    const anonymous=(origin=base)=>new Request(base+'/api/search',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify(query)});
+    const search=await POST(anonymous());assert.equal(search.status,200);assert.equal((await search.json()).status,'blocked');
+    assert.equal((await GET(new Request(base+'/api/capabilities'))).status,200);
+    assert.equal((await POST(anonymous('https://other.test'))).status,403);
+  }finally{delete process.env.VERCEL;}
 });

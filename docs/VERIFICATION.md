@@ -137,6 +137,27 @@ Checks run:
 - In the local preview, the page showed no saved-research box or external link. The footer sat 30px below the provider cards on desktop and 25px below them on a 390px-wide phone screen, with no sideways scrolling. A search still showed its plan, and the console had no errors or warnings.
 - `npm test` (41 passed), TypeScript, lint and the production build passed in this folder. The same checks passed on an exported copy of the commit after a clean `npm ci`, and that build's `hosting.json` had no project identifier.
 
+## Vercel deployment — 7 November 2026
+
+The owner's first Vercel deployment failed. Vercel saw `next` in `package.json` and used its Next.js setup, but `npm run build` runs the Sites build, which writes a Cloudflare Worker to `dist/`. Vercel then found no `.next/routes-manifest.json` and stopped (`NEXT_NO_ROUTES_MANIFEST`). This was reproduced with Vercel CLI 65.11.0 on a fresh clone of commit 2c35c6a.
+
+Changes:
+
+- `vercel.json` makes Vercel run `next build`. Real Next.js could not resolve `./connector-contract.mjs`, because the file is `.mts` and only Vite maps the name; Turbopack and webpack both failed. `lib/connectors.ts` now imports `./connector-contract.mts`, and `tsconfig.json` allows that with `allowImportingTsExtensions`.
+- Vercel has no ChatGPT sign-in, so the API would have rejected every search with 401. When `VERCEL=1`, the identity check is skipped and the site is public; the same-origin check for searches stays. The header badge reads "Public demo" and the footer "Public demo of an India-first pilot". The page description no longer calls the planner private.
+- `next` and `eslint-config-next` are upgraded from 16.3.4 to 16.4.5. On Vercel, Next.js is the server, and 16.3.4 has critical advisories, including remote code execution in the image optimizer, `next/og` and `use cache`. `npm audit` now reports no advisories for `next` and nothing critical.
+- `/.vercel/` is ignored by git.
+
+Checks run:
+
+- `npm test`: 42 passed, including a new test that on Vercel searches and site checks work without sign-in while other-origin searches still get 403. TypeScript, lint and the Sites build passed.
+- `vercel build` (Vercel CLI 65.11.0, Next.js preset) passed on an export of the working tree with the public `hosting.json`.
+- Served with `VERCEL=1`, that build returned 200 for a same-origin search without sign-in, 403 for another origin and 200 for the site check. Served without `VERCEL`, the same search returned 401.
+- In the browser against the Vercel-mode build, the header showed "Public demo", a Gurugram → Jamalpur search showed its 120-query plan, and Recheck site access reported that connected-app details are not available in this environment. The console had no errors or warnings; Chrome's hint about form fields without an id or name also appears on the Sites version.
+- After a restart, the local dev server (Sites rules) still shows "Your private travel desk".
+
+Not checked: installing the new lockfile through Sites' managed installer, which cannot run here.
+
 ## Release boundary
 
 The new Site was created owner-private. Publication uses the private deployment operation, which verifies the owner-only audience, without changing sharing. Production publication evidence belongs to the returned Sites deployment record. No authenticated hosted travel-app read has been attempted or passed. Enabling live results requires the remaining integration gates in IMPLEMENTATION.md.
