@@ -172,6 +172,20 @@ Checks run:
 
 Not checked: page views arriving in the Vercel dashboard, which needs the deployed site.
 
+Result: after commit 452e1b3 was pushed, Vercel reported "Deployment has completed" on GitHub.
+
+## Vercel Speed Insights — 7 November 2026
+
+The owner turned on Speed Insights in the Vercel project. `@vercel/speed-insights` is installed at 2.0.0 (pinned), and `<SpeedInsights />` renders next to `<Analytics />`, again only when `VERCEL=1`. Version 2.0.0 (March 2026) was chosen over 2.1.0 because 2.1.0 had been published only two days earlier.
+
+Checks run:
+
+- `npm test` (42 passed), TypeScript, lint and the Sites build passed.
+- In the local Sites-mode preview, no Vercel script loaded, a search showed its plan, and the console showed only React's developer-tools note.
+- `vercel build` passed on an export of the working tree. Served with `VERCEL=1`, the page added `/_vercel/speed-insights/script.js` (from `@vercel/speed-insights/next` 2.0.0) next to the analytics script, and a search still worked. Locally both scripts return 404, because only Vercel's platform serves them. Served without `VERCEL`, the page loaded neither and the console was empty.
+
+Not checked: performance data arriving in the Vercel dashboard, which needs the deployed site and real visits.
+
 ## Release boundary
 
 The new Site was created owner-private. Publication uses the private deployment operation, which verifies the owner-only audience, without changing sharing. Production publication evidence belongs to the returned Sites deployment record. No authenticated hosted travel-app read has been attempted or passed. Enabling live results requires the remaining integration gates in IMPLEMENTATION.md.

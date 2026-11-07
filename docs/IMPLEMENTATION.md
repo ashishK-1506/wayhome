@@ -17,7 +17,7 @@ The search API returns the prepared plan with HTTP 200, `status: blocked`, `cove
 | File | Responsibility |
 |---|---|
 | `app/page.tsx` | Dynamic entry; passes today's IST date (the form defaults to tomorrow) |
-| `app/layout.tsx` | Product metadata, global CSS, and Vercel Web Analytics when running on Vercel |
+| `app/layout.tsx` | Product metadata, global CSS, and Vercel Web Analytics and Speed Insights when running on Vercel |
 | `app/travel-portal.tsx` | City pickers, preferences, request cancellation, plan and audit, provider and site status, journey view |
 | `app/globals.css` | Responsive design, keyboard focus, reduced motion, print |
 | `app/api/search/route.ts` | Identity and origin guard, body limit, validated plan, explicit blocked result |
