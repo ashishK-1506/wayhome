@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
+import { publicHosting } from "@/lib/api-guard";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,7 +19,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        {children}
+        {/* Vercel Web Analytics exists only on Vercel; Sites has no analytics script to load. */}
+        {publicHosting() && <Analytics />}
+      </body>
     </html>
   );
 }

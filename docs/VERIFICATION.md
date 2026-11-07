@@ -158,6 +158,20 @@ Checks run:
 
 Not checked: installing the new lockfile through Sites' managed installer, which cannot run here.
 
+Result: after commit 776ab9c was pushed, Vercel reported "Deployment has completed" on GitHub.
+
+## Vercel Web Analytics — 7 November 2026
+
+The owner turned on Web Analytics in the Vercel project. Following Vercel's Next.js steps, `@vercel/analytics` 2.0.1 is installed (pinned) and `app/layout.tsx` renders its `<Analytics />` component, but only when `VERCEL=1`. Sites has no `/_vercel/insights/script.js`, so loading it there would only add a failed request and a console message.
+
+Checks run:
+
+- `npm test` (42 passed), TypeScript, lint and the Sites build passed.
+- In the local Sites-mode preview, no analytics script loaded, a search showed its plan, and the console showed only React's developer-tools note.
+- `vercel build` passed on an export of the working tree. Served with `VERCEL=1`, the page added `/_vercel/insights/script.js` (from `@vercel/analytics/next` 2.0.1), and a search still worked. Locally that script returns 404, because only Vercel's platform serves it. Served without `VERCEL`, the page loaded no analytics script and the console was empty.
+
+Not checked: page views arriving in the Vercel dashboard, which needs the deployed site.
+
 ## Release boundary
 
 The new Site was created owner-private. Publication uses the private deployment operation, which verifies the owner-only audience, without changing sharing. Production publication evidence belongs to the returned Sites deployment record. No authenticated hosted travel-app read has been attempted or passed. Enabling live results requires the remaining integration gates in IMPLEMENTATION.md.

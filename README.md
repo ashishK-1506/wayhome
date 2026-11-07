@@ -44,10 +44,11 @@ The site is owner-private. Sites signs visitors in with ChatGPT and passes their
 
 ### Vercel (public demo)
 
-The Sites build produces a Cloudflare Worker, which Vercel cannot serve, so `vercel.json` makes Vercel build the app with `next build` instead. Two things differ there:
+The Sites build produces a Cloudflare Worker, which Vercel cannot serve, so `vercel.json` makes Vercel build the app with `next build` instead. Three things differ there:
 
 - **The site is public.** Vercel has no ChatGPT sign-in, so when `VERCEL=1` the API skips the identity check and anyone with the link can use the site. The page says "Public demo" instead of "Your private travel desk". Searches must still come from the site itself (a matching `Origin`).
 - **Next.js is the server.** On Sites, Next.js only supplies types and lint rules. On Vercel it runs the site, so `next` is kept at 16.4.5, which fixes the critical advisories in 16.3.4.
+- **Visitor counts.** On Vercel the layout adds Vercel Web Analytics (`@vercel/analytics`), which counts page views without cookies. It needs Analytics turned on in the Vercel project. Sites does not load it.
 
 Travel-app connections exist only on Sites, so a Vercel deployment can only show search plans.
 
