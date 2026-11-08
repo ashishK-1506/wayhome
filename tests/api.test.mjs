@@ -87,3 +87,19 @@ test('a failing live source still returns the plan, with the reason',async()=>{
     assert.equal(data.result.journeys.length,0);assert.equal(data.sourceQueries.failed,data.sourceQueries.attempted);
   }finally{globalThis.fetch=realFetch;delete process.env.IRCTC_DEV_API_KEY;}
 });
+test('the local dev server runs live trains without the passcode; a deployed site still needs it',async()=>{
+  process.env.IRCTC_DEV_API_KEY='test-key';process.env.WAYHOME_LIVE_PASSCODE='open sesame';
+  const realFetch=globalThis.fetch;globalThis.fetch=fakeIrctcDev();
+  const at=(origin,extra={})=>new Request(origin+'/api/search',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json',...extra},body:JSON.stringify(query)});
+  try{
+    process.env.NODE_ENV='development';
+    let data=await (await POST(at('http://localhost:5173'))).json();
+    assert.equal(data.status,'live');assert.equal(data.live.state,'ran');
+    // Not the local machine: the passcode still applies, even in development.
+    data=await (await POST(at(base,{'oai-authenticated-user-id':'test-visitor'}))).json();
+    assert.equal(data.live.state,'passcode_required');
+    process.env.NODE_ENV='production';
+    data=await (await POST(at('http://localhost:5173',{'oai-authenticated-user-id':'test-visitor'}))).json();
+    assert.equal(data.live.state,'passcode_required');
+  }finally{globalThis.fetch=realFetch;process.env.NODE_ENV='production';delete process.env.IRCTC_DEV_API_KEY;delete process.env.WAYHOME_LIVE_PASSCODE;}
+});

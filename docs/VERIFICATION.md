@@ -242,6 +242,16 @@ The owner added an irctc.dev key in `.env.local`, which git ignores. A few direc
 
 Checks run after the changes: `npm test` (54 passed), TypeScript, lint, the Sites build and `vercel build`.
 
+## Passcode not needed on the local dev server — 8 November 2026
+
+The owner's searches on the local dev server came back with every query `not_attempted`. The browser had sent no passcode, or a different phrase from the one in `.env.local`, so the API returned the plan with `live.state` `passcode_required` or `passcode_rejected`. The passcode protects the quota on a public site, and nobody else can reach the local dev server. That server now skips it, using the same rule as the sign-in check: `NODE_ENV` is `development` and the address is localhost. Deployed sites still require it.
+
+Checks run:
+
+- `npm test`: 55 passed. A new test checks that the local dev server runs live without the passcode, while another address in development, and localhost in production, still need it.
+- TypeScript and lint passed.
+- The owner's exact search on the dev server, with no passcode, returned `status: live`: New Delhi → Jamalpur, 9 November, all modes. 9 train searches succeeded and found 60 journeys. None had seats on every leg, because the checked trains were waitlisted. The other planned queries stay `not_attempted` by design: flights, buses and carpools are not live, and a search runs at most 11 train searches.
+
 ## Release boundary
 
 The new Site was created owner-private. Publication uses the private deployment operation, which verifies the owner-only audience, without changing sharing. Production publication evidence belongs to the returned Sites deployment record. No authenticated hosted travel-app read has been attempted or passed. Enabling live results requires the remaining integration gates in IMPLEMENTATION.md.

@@ -33,12 +33,12 @@ Live train results come from [irctc.dev](https://irctc.dev), an unofficial India
 
 1. Sign in at irctc.dev with Google and copy your API key. The free allowance is 10,000 requests.
 2. Set the variables below in `.env.local` for local use (git ignores it; both `npm run dev` and the Vercel build read it), and under Settings → Environment Variables on Vercel.
-3. Search with Trains selected, after entering the passcode once under Search preferences.
+3. Search with Trains selected. On a deployed site, enter the passcode once under Search preferences; the local dev server does not ask for it.
 
 | Variable | Value |
 |---|---|
 | `IRCTC_DEV_API_KEY` | Your irctc.dev key. Never commit it. |
-| `WAYHOME_LIVE_PASSCODE` | Any phrase. When set, only searches that send it run live and everyone else gets the plan, so visitors cannot use up the quota. Recommended on a public site. |
+| `WAYHOME_LIVE_PASSCODE` | Any phrase. When set, only searches that send it run live and everyone else gets the plan, so visitors cannot use up the quota. Recommended on a public site. The local dev server (`npm run dev` on localhost) skips it, because only you can reach it. |
 
 What a live search does:
 

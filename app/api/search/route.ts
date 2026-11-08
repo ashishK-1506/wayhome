@@ -1,4 +1,4 @@
-import { guard, PRIVATE_HEADERS } from '@/lib/api-guard';
+import { guard, isLocalDev, PRIVATE_HEADERS } from '@/lib/api-guard';
 import { buildSearchPlan, ValidationError } from '@/lib/planner.mjs';
 import { evaluateJourneys } from '@/lib/engine.mjs';
 import { liveAccess, runLiveTrains } from '@/lib/live/trains.mjs';
@@ -38,9 +38,11 @@ export async function POST(request: Request) {
   try{
     const plan=buildSearchPlan(input),providers=providerStatus();
     // Live trains run only with the owner's irctc.dev key, and, when a passcode is set, only for
-    // requests that send it, so visitors to a public deployment cannot spend the quota.
+    // requests that send it, so visitors to a public deployment cannot spend the quota. The local
+    // dev server skips the passcode: nobody else can reach it.
     const key=process.env.IRCTC_DEV_API_KEY?.trim()||undefined;
-    const access=liveAccess({key,passcode:process.env.WAYHOME_LIVE_PASSCODE?.trim()||undefined},request.headers.get('x-wayhome-passcode'));
+    const passcode=isLocalDev(request)?undefined:process.env.WAYHOME_LIVE_PASSCODE?.trim()||undefined;
+    const access=liveAccess({key,passcode},request.headers.get('x-wayhome-passcode'));
     if(access==='allowed'&&key&&plan.query.modes.includes('train')){
       const live=await runLiveTrains(plan,{key,baseUrl:process.env.IRCTC_DEV_BASE_URL?.trim()||undefined});
       // Failed calls by reason, for the server log only (no key, no user details).
