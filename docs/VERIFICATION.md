@@ -186,6 +186,62 @@ Checks run:
 
 Not checked: performance data arriving in the Vercel dashboard, which needs the deployed site and real visits.
 
+Result: after commit 94c5f68 was pushed, Vercel reported "Deployment has completed" on GitHub.
+
+## Live trains through irctc.dev — 8 November 2026
+
+The owner chose unofficial data services for live results. SerpApi's phone verification failed, so flights wait; trains are built against irctc.dev's documented API.
+
+- `lib/live/irctc-dev.mjs` calls irctc.dev with the key in the `x-api-key` header and converts trains, seats and fares into engine services and offers. `lib/live/trains.mjs` checks the key and passcode, chooses at most 7 planned searches and 6 trains to check, and runs them.
+- `/api/search` runs live trains when `IRCTC_DEV_API_KEY` is set and, if `WAYHOME_LIVE_PASSCODE` is set, the passcode matches. It then returns `status: live`; otherwise it returns the plan with `live.state` saying why.
+- The page has a passcode field under Search preferences, kept in that browser. Live results show the source, seat count and check time on each leg, with a note on how much ran and a state for each planned query in the plan table. There are messages for a missing or wrong passcode, a failed source and journeys without seats. Two wording problems that only appear once journeys are shown were fixed: "1 intercity services", and offer lines without a seat count or source.
+- The test data is made up and only shaped like irctc.dev's documented answers, because its terms forbid republishing its data. Nothing is cached, because its terms allow caching only for performance.
+
+Checks run:
+
+- `npm test`: 52 passed, 10 of them new. They cover:
+  - conversion and validation, access, and the call budget
+  - journeys from live data: a direct train with seats, a change at Patna, a waitlisted train
+  - rejected keys, a used-up quota, upstream errors, and per-call and overall time limits
+  - the API's passcode states
+- TypeScript, lint, the Sites build and `vercel build` passed. `npm run dev` and the Vercel build both read `.env.local`; this was checked with a throwaway file, which was then removed.
+- A local stand-in for irctc.dev served the made-up answers and accepted only the test key. In headless Chrome, against the Vercel build with a test passcode:
+  - Without the passcode, the page asked for it and opened Search preferences.
+  - With it, 7 searches and seat checks for 4 trains ran. The page showed the direct train with 140 SL seats at ₹620, and the change at Patna.
+  - Unticking "Offers on all legs" added the waitlisted train, and the Flights tab said only trains are live.
+  - A wrong passcode showed the plan with the reason.
+  - The console showed nothing apart from the Vercel analytics scripts, which only Vercel serves.
+- The dev server with no key still shows the plan-only page, with every query "Not attempted".
+
+This first version was built before a key was available. It was checked against the real API later the same day; see the next entry.
+
+## Live trains checked against the real irctc.dev API — 8 November 2026
+
+The owner added an irctc.dev key in `.env.local`, which git ignores. A few direct calls recorded real answers in a scratch folder outside the repository.
+
+**What matched:**
+- Field names and formats for searches, seats and fares.
+- Station matching: every returned train ran between the stations asked for.
+- Arrival times: departure plus duration agreed with the arrival clock time for all 14 trains seen.
+
+**What differed, and the changes made:**
+- **Running days count from the train's first station.** `fromStationDayOffset` gives the day the train reaches the boarding station. Without the shift, 5 of the 11 Patna → Jamalpur trains returned for a Monday would have been dropped; with it, all 11 run that day.
+- **The search's class list is always empty.** Fares are now looked up first; they list the classes, so seat checks only go to classes the train has. A train without 3A or SL is checked in its main class, such as chair car.
+- **Seat checks are limited to 10 a minute.** A search now makes at most 8. HTTP 429 counts as `rate_limited`, unless the answer mentions credits or quota, and the page explains refused checks.
+- **Seat answers carry `syncedAt`**, which is now the check time. irctc.dev served some cached answers up to 7 minutes old, which the engine then does not count as current.
+- **More origin stations.** New Delhi → Jamalpur and Gurgaon → Patna had no trains, but Anand Vihar → Jamalpur had 3. A search now covers every direct origin station and up to three origins for the change, at most 11 searches. One call took more than 6 seconds, so the per-call limit is now 8.
+- **Display.** A waitlisted leg showed "Availability not established", and a journey without a confirmed fare showed "₹0". Legs now show each checked class with irctc.dev's code and fare, for example "3A waitlist (GNWL361/WL148) · ₹1,520", and `REGRET` reads "booking closed". A journey without a confirmed fare says "Fare not confirmed".
+
+**Real runs**, all Gurugram → Jamalpur for 9 November, all modes, extended depth:
+- **Through the dev server's API:** 10 searches succeeded and found 34 trains, giving 51 journeys. Fares and seats were checked for 6 trains; all were waitlisted or closed. 3 of 24 calls failed (2 upstream errors, 1 timeout). The first run took 7.8 seconds; later runs took about 2, as irctc.dev cached.
+- **In headless Chrome, against the Vercel build** with the key and the passcode typed into Search preferences:
+  - With "Offers on all legs" on, the page said "No journey has seats on every leg" and explained that 51 journeys were found without seats in 3A, CC or SL.
+  - Unticking the filter showed all 51, with waitlist codes and fares in the leg details. The console was clean.
+- **In headless Chrome, against the dev server:** the same results, with "booking closed" for `REGRET`.
+- These checks used about 80 of the 10,000 free requests.
+
+Checks run after the changes: `npm test` (54 passed), TypeScript, lint, the Sites build and `vercel build`.
+
 ## Release boundary
 
 The new Site was created owner-private. Publication uses the private deployment operation, which verifies the owner-only audience, without changing sharing. Production publication evidence belongs to the returned Sites deployment record. No authenticated hosted travel-app read has been attempted or passed. Enabling live results requires the remaining integration gates in IMPLEMENTATION.md.

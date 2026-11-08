@@ -1,16 +1,33 @@
 # Wayhome implementation record
 
-Created 4 November 2026; last updated 5 November 2026. This is the design record: what was built, the contracts it follows and what remains. Dated test results are in [VERIFICATION.md](VERIFICATION.md), and terms are defined in the [README glossary](../README.md#glossary).
+Created 4 November 2026; last updated 8 November 2026. This is the design record: what was built, the contracts it follows and what remains. Dated test results are in [VERIFICATION.md](VERIFICATION.md), and terms are defined in the [README glossary](../README.md#glossary).
 
 ## Decision
 
 The owner chose to get live results from the travel apps available in ChatGPT, connected to this site through Sites: ConfirmTkt for trains, Skyscanner for flights and BlaBlaCar for buses and carpools ("connected travel apps", option 2 of the original proposal). No fallback, such as provider API keys or links to provider search pages, has been chosen, and none will be added without the owner's decision.
 
+On 8 November 2026, while Sites access is pending, the owner also chose unofficial data services, used with the owner's own keys: irctc.dev for trains, built now, and SerpApi's Google Flights search for flights, waiting for its account verification. These are optional and off without a key. The owner declined rotating several free accounts to raise limits, because the providers treat that as abuse.
+
 ## Current delivery boundary
 
-The app is a private Sites Worker app built on the supplied Vinext/React starter. It has an interactive search form, bounded query planning, a normalized itinerary evaluator and an exportable audit. It has **not** completed live-provider integration. Sites plugin-eligibility discovery was not available when this was built, so no provider-specific connector IDs, hosted action mappings or consent paths have been verified. Travel-app tools available inside a ChatGPT conversation do not prove that this website can use them. No snapshots have been substituted for live results.
+The app is a private Sites Worker app built on the supplied Vinext/React starter. It has an interactive search form, bounded query planning, a normalized itinerary evaluator and an exportable audit. It has **not** completed the connected-travel-app integration; the optional live trains described below are an interim, unofficial source. Sites plugin-eligibility discovery was not available when this was built, so no provider-specific connector IDs, hosted action mappings or consent paths have been verified. Travel-app tools available inside a ChatGPT conversation do not prove that this website can use them. No snapshots have been substituted for live results.
 
-The search API returns the prepared plan with HTTP 200, `status: blocked`, `coverage: not_started`, zero attempted queries and empty inventory. Clients must read `status`: `blocked` means the integration is not set up; it is never evidence that tickets are sold out. (Until 5 November 2026 this response used HTTP 503, which browsers and tools showed as a failed request.) Provider cards show a fixed pending setup state, not live provider health. "Recheck site access" shows what Sites reports about this site's connected apps (site policy and action names); it does not test sign-in or query inventory. There is no provider scheduler, provider adapter, consent flow, cache or inventory store. These are unfinished integration work, not features that merely need a user login.
+The search API returns the prepared plan with HTTP 200, `status: blocked`, `coverage: not_started`, zero attempted queries and empty inventory. Clients must read `status`: `blocked` means the integration is not set up; it is never evidence that tickets are sold out. (Until 5 November 2026 this response used HTTP 503, which browsers and tools showed as a failed request.) Provider cards show a fixed pending setup state, not live provider health. "Recheck site access" shows what Sites reports about this site's connected apps (site policy and action names); it does not test sign-in or query inventory. There is no scheduler, consent flow, cache or inventory store, and no adapter for the connected travel apps. These are unfinished integration work, not features that merely need a user login.
+
+**Live trains (optional).** With `IRCTC_DEV_API_KEY` set, a search that includes trains and passes the passcode check (`WAYHOME_LIVE_PASSCODE`, sent as the `x-wayhome-passcode` header) runs a small part of its plan against irctc.dev and returns `status: live`. `lib/live/trains.mjs` picks at most 11 planned train searches: every direct search on the chosen date, then one change at the first hub the plan links both ways. For that change it searches from up to three origin stations to the hub that day, and from the hub to the destination that day or the next.
+
+It then chooses at most 6 trains to check: the fastest direct trains, plus the feeder and onward pair with the earliest arrival that leaves at least an hour to change. For each of these it first looks up fares; the fare answer is the only reliable list of a train's classes, since the search's class list comes back empty. Seats are then checked in 3A and SL where the train has them, or otherwise in its first class from 3E, CC, 2S, 2A, EC and 1A. Each train gets one class checked before any gets a second, with at most 8 seat checks, because irctc.dev allows 10 a minute.
+
+Calls run four at a time, each limited to 8 seconds and the whole search to 20. Nothing is cached, and failed calls are logged on the server by reason.
+
+`lib/live/irctc-dev.mjs` converts answers into the engine's services and offers:
+- It keeps a train only when its stations match the query and its arrival clock time agrees with departure plus duration.
+- Running days count from the train's first station, so they are shifted by `fromStationDayOffset` before checking the boarding date.
+- Only "AVAILABLE-n" answers carry a seat count. Every offer keeps irctc.dev's own status text, such as `GNWL135/WL62`, and the page shows `REGRET` as "booking closed".
+- An offer's check time is irctc.dev's `syncedAt` (never later than now). Its cache can serve answers several minutes old, and the engine's two-minute freshness limit then stops them counting as available.
+- Every offer names `irctc.dev` and links to the ConfirmTkt search for that route and date.
+
+The response formats were checked against the real API on 8 November 2026 (see VERIFICATION.md).
 
 ## Source files
 
@@ -28,8 +45,12 @@ The search API returns the prepared plan with HTTP 200, `status: blocked`, `cove
 | `lib/engine.mjs`, `lib/engine.d.mts` | Service deduplication, connection search, capacity and freshness checks, ranking |
 | `lib/provider-status.ts` | Explicit integration block (also the page's initial provider list); no guessed connectors |
 | `lib/api-guard.ts` | Hosted identity requirement (skipped on Vercel, which has no sign-in) and same-origin check for searches |
+| `lib/live/irctc-dev.mjs`, `lib/live/irctc-dev.d.mts` | irctc.dev client: calls with time limits and failure kinds, and conversion of trains, seats and fares into engine services and offers |
+| `lib/live/trains.mjs`, `lib/live/trains.d.mts` | Live-train access check (key and passcode), choice of searches and trains within the call budget, and the live run |
 | `tests/planner.test.mjs` | Deterministic planner and engine assertions |
-| `tests/api.test.mjs` | The real route handlers: identity, origin, input limits, privacy, site status, internal errors |
+| `tests/api.test.mjs` | The real route handlers: identity, origin, input limits, privacy, site status, internal errors, live-train passcode states and source failures |
+| `tests/live.test.mjs` | Live-train conversion, access, budget, journeys from live data, rejected keys, quota and time limits |
+| `tests/fixtures/irctc-dev.mjs` | A made-up stand-in for irctc.dev, shaped like its documented answers; no real data |
 | `tests/properties.test.mjs` | Randomized property tests with fixed seeds: planner and engine rules, junk input, malformed records, work-limit fairness, booking links |
 | `tests/fixtures/connecting-services.mjs` | Controlled fixtures imported only by tests; no current inventory evidence |
 | `public/favicon.svg` | Product icon |
@@ -66,7 +87,9 @@ No database migration or external API account is needed for this phase, and no s
 | Search without a matching `Origin` header | 403 |
 | Body over 16,000 bytes | 413. A body up to 1 MB is read and discarded first, because the local Workers runtime otherwise fails the next request |
 | Unreadable JSON or invalid input | 400 with a message for the user |
-| Valid search | 200 with `status: blocked`, the plan, zero attempted queries and empty results |
+| Valid search without live trains | 200 with `status: blocked`, the plan, zero attempted queries, empty results and `live.state` saying why: `not_configured` (no key), `not_applicable` (trains not selected) |
+| Live trains set up, passcode missing or wrong | 200 with `status: blocked` and `live.state` `passcode_required` or `passcode_rejected` |
+| Valid search with live trains | 200 with `status: live`, `coverage: partial` (unless every planned query ran), each query that ran marked `succeeded` or `failed` with `source: irctc.dev`, and journeys from the engine. If every call failed, `live.problem` says why (`auth`, `quota`, `timeout`, `unreachable`, `upstream`, `bad_response`) |
 | Unexpected server error | 500 with a generic message; details go to the server log |
 
 `GET /api/capabilities` also requires identity. It returns the provider setup states and a `site` object with what Sites reports about connected apps. Neither endpoint accepts arbitrary URLs, connector identifiers or action names. In local development on localhost the identity check is skipped, and the dev server supplies a mock identity. On Vercel, which has no ChatGPT sign-in, the identity check is skipped too, so a Vercel deployment is public; searches still need a matching `Origin`.
@@ -159,7 +182,7 @@ The 5 November review found these provider-independent items:
 
 ### Open decisions
 
-- **If Sites access does not arrive:** links to provider search pages, a hand-kept timetable for the owner's routes, or unofficial APIs. None is chosen.
+- **If Sites access does not arrive:** links to provider search pages, a hand-kept timetable for the owner's routes, or unofficial APIs. Unofficial APIs were chosen on 8 November 2026 as an interim (see Decision); trains are built, flights wait for SerpApi.
 - **Waitlist and RAC trains:** whether to show them. They never count as available, and the default filter hides journeys without offers on every leg.
 - **How live searches run:** one request that streams progress, or stored runs that the page polls. This depends on how long Sites keeps a request's connector access; the local preview allows 60 seconds.
 - **Status codes once live results exist:** blocked plans now return 200 with `status: blocked`. Complete and partial results should also return 200 with their own `status`; a 5xx should mean the search itself failed (for example, every provider query erroring).

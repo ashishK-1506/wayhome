@@ -13,3 +13,4 @@
 .available-filter{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);white-space:nowrap}.available-filter input{accent-color:#2563eb;width:15px;height:15px}.result-toolbar{flex-wrap:wrap;gap:14px}.result-tabs{margin-right:auto}
 @media(max-width:780px){.available-filter{order:2}.sort-label{order:3;margin-left:auto}.result-tabs{width:100%;overflow-x:auto}.result-toolbar{align-items:center}}
 @media(max-width:520px){.available-filter{font-size:11px}.sort-label{font-size:12px;gap:5px}.sort-label select{max-width:175px;font-size:11px}}
+.live-note{font-size:12px;color:#2f5a49;background:#eef6f2;border:1px solid #d7e8df;padding:10px 12px;border-radius:5px;line-height:1.6}.table-state.succeeded{background:#e9f4ee;color:#2f5f49}.table-state.failed{background:#fbeeee;color:#8a3b3b}

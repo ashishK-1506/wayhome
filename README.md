@@ -8,10 +8,11 @@ A private, India-first journey planner for trains, flights, buses and shared rid
 
 - The search form: cities (searchable by name or station/airport code), date with ±1–2 days of flexibility, travellers, modes, depth and preferences.
 - The search plan: the bounded list of [provider queries](#glossary) a search would send, shared across the chosen dates and sources, with a downloadable JSON audit.
-- A route engine for journeys of up to five services, with connection times, seat and fare freshness, and a fare cap. It is tested with fixtures and randomized data only; no live data feeds it yet.
+- A route engine for journeys of up to five services, with connection times, seat and fare freshness, and a fare cap. It is tested with fixtures and randomized data.
+- Optional live trains: with an irctc.dev API key, a search checks real trains, seats and fares for a few of its planned routes. See [Live trains](#live-trains-optional).
 - "Recheck site access", which reports the connected apps that [Sites](#glossary) makes available to this site.
 
-**What is not built: live results.** There are no provider adapters, scheduler or consent handling yet. Their design cannot be finished until Sites shows which travel apps this site may use: ConfirmTkt (trains), Skyscanner (flights) and BlaBlaCar (buses and carpools). Until then every search returns its plan (HTTP 200) with `status: "blocked"` and zero queries attempted. That means "not connected", never "sold out". This release has no current fares or seats, and the page never substitutes test data or saved research for live results.
+**What is not built: live flights, buses and carpools, and the connected travel apps.** There are no adapters for ConfirmTkt, Skyscanner or BlaBlaCar through Sites; their design cannot be finished until Sites shows which travel apps this site may use. Without the train key, every search returns its plan (HTTP 200) with `status: "blocked"` and zero queries attempted. That means "not connected", never "sold out". The page never substitutes test data or saved research for live results.
 
 See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the design and remaining work, and [docs/VERIFICATION.md](docs/VERIFICATION.md) for what has been checked.
 
@@ -24,7 +25,32 @@ npm ci
 npm run dev    # then open http://localhost:5173
 ```
 
-Locally there is no real sign-in (the dev server uses a mock identity), and every search shows its plan with "Live search pending". That is expected.
+Locally there is no real sign-in (the dev server uses a mock identity), and without the train key every search shows its plan with "Live search pending". That is expected.
+
+## Live trains (optional)
+
+Live train results come from [irctc.dev](https://irctc.dev), an unofficial Indian Railways data service. They stay off until a key is set.
+
+1. Sign in at irctc.dev with Google and copy your API key. The free allowance is 10,000 requests.
+2. Set the variables below in `.env.local` for local use (git ignores it; both `npm run dev` and the Vercel build read it), and under Settings → Environment Variables on Vercel.
+3. Search with Trains selected, after entering the passcode once under Search preferences.
+
+| Variable | Value |
+|---|---|
+| `IRCTC_DEV_API_KEY` | Your irctc.dev key. Never commit it. |
+| `WAYHOME_LIVE_PASSCODE` | Any phrase. When set, only searches that send it run live and everyone else gets the plan, so visitors cannot use up the quota. Recommended on a public site. |
+
+What a live search does:
+
+- **Searches.** It runs every planned direct train search on the chosen date, plus one change at the first hub the plan links both ways, from up to three origin stations: at most 11 searches.
+- **Fares and seats.** It looks up fares for at most 6 trains; the fare answer also shows which classes a train has. It then checks seats in 3A and SL where the train has them, or otherwise in its main class, such as chair car. There are at most 8 seat checks, because irctc.dev allows 10 a minute.
+- **Calls.** That is up to 25 calls, four at a time, each limited to 8 seconds and the whole search to 20.
+- **Labels.** Each offer names its source and links to the ConfirmTkt search for that route and date. Its check time is when irctc.dev last refreshed the answer, which can be several minutes old because irctc.dev caches.
+- **Availability.** As with any source, a train counts as available only with a seat count from the last two minutes. Waitlist, RAC and closed bookings are shown with irctc.dev's own codes, such as `GNWL12/WL5` or `REGRET` ("booking closed").
+- **No caching.** Nothing is cached here: irctc.dev's terms allow caching only for performance, not to reduce usage.
+- **Failures.** If irctc.dev rejects the key, runs out of quota, refuses checks over its per-minute limit or does not answer, the search still returns its plan, with the reason.
+
+irctc.dev states that it is not an official source, so recheck with IRCTC or ConfirmTkt before paying. Flights (planned through SerpApi's Google Flights search), buses and carpools are not live yet.
 
 ## Checks
 
