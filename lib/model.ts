@@ -4,8 +4,12 @@ export type OfferStatus = 'available' | 'rac' | 'waitlist' | 'request' | 'unknow
 export interface Terminal { id: string; name: string; cityId: string; }
 export interface Place { id: string; name: string; state: string; aliases: string[]; rail: string[]; airports: string[]; lat: number; lon: number; hub?: boolean; }
 export interface SearchQuery { originId: string; destinationId: string; date: string; passengers: number; modes: Mode[]; depth: Depth; flexibility: 0 | 1 | 2; budget: number | null; maxHours: number; latestArrival?: string | null; availabilityOnly: boolean; }
-export interface Offer { id: string; status: OfferStatus; classCode: string; quota?: string; seats?: number; amount: number | null; currency: string; priceBasis: 'person' | 'party'; partySize?: number; checkedAt: string; expiresAt?: string; bookingUrl?: string; linkType?: 'offer' | 'search'; source: string; statusText?: string; openingVerified?: boolean; }
-export interface Service { id: string; mode: Mode; number: string; name: string; from: Terminal; to: Terminal; departAt: string; arriveAt: string; offers: Offer[]; }
+// One day from a provider's availability calendar.
+export interface CalendarDay { date: string; status: OfferStatus; seats?: number; statusText?: string; }
+// A class and its fare, as a provider lists them for a service.
+export interface Fare { classCode: string; amount: number; }
+export interface Offer { id: string; status: OfferStatus; classCode: string; quota?: string; seats?: number; amount: number | null; currency: string; priceBasis: 'person' | 'party'; partySize?: number; checkedAt: string; expiresAt?: string; bookingUrl?: string; linkType?: 'offer' | 'search'; source: string; statusText?: string; calendar?: CalendarDay[]; openingVerified?: boolean; }
+export interface Service { id: string; mode: Mode; number: string; name: string; from: Terminal; to: Terminal; departAt: string; arriveAt: string; offers: Offer[]; fares?: Fare[]; }
 export interface Transfer { fromId: string; toId: string; minutes: number; bufferMinutes: number; cost: number | null; evidence: string; }
 export interface Journey { id: string; services: Service[]; selectedOffers: (Offer | null)[]; durationMinutes: number; knownCost: number; costComplete: boolean; offersOnAllLegs: boolean; transfers: { from: string; to: string; gap: number; required: number | null; known: boolean; tight: boolean; cost: number | null; }[]; feasibility: 'feasible' | 'unverified'; warnings: string[]; }
 export interface EngineResult { journeys: Journey[]; counters: { servicesReceived: number; servicesDeduplicated: number; statesExpanded: number; candidatesGenerated: number; itinerariesEvaluated: number; connectionsEvaluated: number; connectionFeasible: number; availabilityChecked: number; offersOnAllLegs: number; rejected: Record<string, number>; truncated: boolean; }; }

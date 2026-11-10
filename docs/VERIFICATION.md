@@ -264,6 +264,30 @@ Checks run:
 - TypeScript and lint passed.
 - The owner's exact request returned `status: live` with 9 `succeeded`, 88 `skipped` and 23 `no_live_source`, and the message "9 train searches ran. 88 other train searches were skipped to save requests, and 23 flight, bus and carpool searches have no live source yet."
 
+## Results shown per train and class — 10 November 2026
+
+The owner asked for results like ConfirmTkt's: each train with a tile per class showing its fare and availability. Each journey card now lists its trains, each with:
+
+- times and station codes
+- a tile per class showing fare, status and colour
+- the next six days for a checked class, from the same answer
+- a ConfirmTkt link
+
+Train records now carry every class with its fare (`Service.fares`), and offers carry the following days (`Offer.calendar`). Neither costs an extra call. A **Check seats** button checks a class that was not checked; **Check fares and seats** looks up a train without fares. Both go through the new `POST /api/seats`.
+
+Journeys are shown seats first and are no longer filtered to seats on every leg by default. A journey is hidden behind **Show them** when another one is at least as good on departure, arrival, changes, seats and price. The display logic moved to `app/journey-view.ts`, and the shared formats to `app/format.ts`.
+
+Checks run:
+
+- `npm test`: 61 passed. Four new tests in `tests/journey-view.test.mjs` cover status wording and colour, merging later checks, prices and which journeys are shown first. New API tests cover `/api/seats` access, input checks, a one-call check, a fallback class and a refused check. The live tests check fares on services and the next days on offers.
+- TypeScript, lint, the Sites build and `vercel build` passed. The Vercel build lists `/api/seats`.
+- In headless Chrome on the dev server with the real key: Patna → Jamalpur, 26 November.
+  - 13334 Pnbe Dumk Express showed SL ₹150 AVL 212 and 3A ₹520 AVL 180, as ConfirmTkt did. Its next days showed AVL 152 to 188, and 3E, 2A and 1A had **Check seats** buttons.
+  - Clicking 3E returned AVL 112 (ConfirmTkt showed AVL 112) in about 0.1 seconds.
+  - 22406 Garib Rath showed 3A ₹385 AVL 23, with cancelled dates in red. The waitlisted 20502 Tejas Rajdhani read "WL 16", as ConfirmTkt did.
+  - 19 of 1,160 journeys were listed. **Show them** showed all 1,160, 20 at a time, and switching back worked.
+  - At phone width, the class tiles scrolled sideways with no page overflow. The console was clean.
+
 ## Release boundary
 
 The new Site was created owner-private. Publication uses the private deployment operation, which verifies the owner-only audience, without changing sharing. Production publication evidence belongs to the returned Sites deployment record. No authenticated hosted travel-app read has been attempted or passed. Enabling live results requires the remaining integration gates in IMPLEMENTATION.md.

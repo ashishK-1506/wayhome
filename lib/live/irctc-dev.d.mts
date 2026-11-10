@@ -1,4 +1,4 @@
-import type { Offer, OfferStatus, Service, Terminal } from '../model';
+import type { CalendarDay, Fare, Offer, OfferStatus, Service, Terminal } from '../model';
 
 export const IRCTC_DEV: 'irctc.dev';
 export const DEFAULT_BASE_URL: string;
@@ -16,7 +16,9 @@ export function parseTrains(data: unknown, from: string, to: string): TrainSumma
 export function runsOn(train: TrainSummary, date: string): boolean;
 export function syncedTime(data: unknown, now: number): number;
 export function parseAvailability(data: unknown, date: string): ParsedAvailability | null;
+export function parseCalendar(data: unknown, date: string, days?: number): CalendarDay[];
 export function parseFares(data: unknown): Map<string, number>;
+export function fareList(fares: Map<string, number>): Fare[];
 export function trainSearchUrl(from: string, to: string, date: string): string;
 export function trainService(train: TrainSummary, input: { date: string; from: Terminal; to: Terminal; offers?: Offer[] }): Service;
-export function trainOffer(input: { trainNo: string; fromCode: string; toCode: string; date: string; classCode: string; availability: ParsedAvailability; fare?: number; checkedAt: string }): Offer;
+export function trainOffer(input: { trainNo: string; fromCode: string; toCode: string; date: string; classCode: string; availability: ParsedAvailability; fare?: number; checkedAt: string; calendar?: CalendarDay[] }): Offer;

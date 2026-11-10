@@ -36,9 +36,13 @@ The response formats were checked against the real API on 8 November 2026 (see V
 | `app/page.tsx` | Dynamic entry; passes today's IST date (the form defaults to tomorrow) |
 | `app/layout.tsx` | Product metadata, global CSS, and Vercel Web Analytics and Speed Insights when running on Vercel |
 | `app/travel-portal.tsx` | City pickers, preferences, request cancellation, plan and audit, provider and site status, journey view |
+| `app/journey-card.tsx` | Result cards: each service with its times, class tiles (fare, status, check time), next days, on-demand seat checks and the booking link |
+| `app/journey-view.ts` | How the cards read offers: status wording and colour, the newest offer per class, a journey's price, and which journeys another one beats |
+| `app/format.ts` | Shared money, time and date formats (always India Standard Time) |
 | `app/globals.css` | Responsive design, keyboard focus, reduced motion, print |
 | `app/api/search/route.ts` | Identity and origin guard, body limit, validated plan, explicit blocked result |
 | `app/api/capabilities/route.ts` | Identity-guarded provider setup states and the connected apps Sites reports |
+| `app/api/seats/route.ts` | On-demand seat check for one train and class, with the same access rules as a search |
 | `lib/model.ts` | Shared search, service, offer, transfer, audit and site-status types |
 | `lib/catalog.mjs`, `lib/catalog.d.mts` | Curated 31-city pilot: station and airport candidates, approximate coordinates, interchange hubs, ranked city and code search |
 | `lib/planner.mjs`, `lib/planner.d.mts` | Input validation, dates, bounded query planning |
@@ -50,6 +54,7 @@ The response formats were checked against the real API on 8 November 2026 (see V
 | `tests/planner.test.mjs` | Deterministic planner and engine assertions |
 | `tests/api.test.mjs` | The real route handlers: identity, origin, input limits, privacy, site status, internal errors, live-train passcode states and source failures |
 | `tests/live.test.mjs` | Live-train conversion, access, budget, journeys from live data, rejected keys, quota and time limits |
+| `tests/journey-view.test.mjs` | Status wording and colour, merging later checks, journey prices, and which journeys are shown first |
 | `tests/fixtures/irctc-dev.mjs` | A made-up stand-in for irctc.dev, shaped like its documented answers; no real data |
 | `tests/properties.test.mjs` | Randomized property tests with fixed seeds: planner and engine rules, junk input, malformed records, work-limit fairness, booking links |
 | `tests/fixtures/connecting-services.mjs` | Controlled fixtures imported only by tests; no current inventory evidence |
@@ -93,6 +98,18 @@ No database migration or external API account is needed for this phase, and no s
 | Unexpected server error | 500 with a generic message; details go to the server log |
 
 `GET /api/capabilities` also requires identity. It returns the provider setup states and a `site` object with what Sites reports about connected apps. Neither endpoint accepts arbitrary URLs, connector identifiers or action names. In local development on localhost the identity check is skipped, and the dev server supplies a mock identity. On Vercel, which has no ChatGPT sign-in, the identity check is skipped too, so a Vercel deployment is public; searches still need a matching `Origin`.
+
+`POST /api/seats` checks one train when a result card asks.
+
+- **Request:** `{ trainNo, from, to, date, classCode?, withFares? }`.
+- **Validation:** `trainNo` must be five digits. The stations must both be pilot stations and different. The date must be from today to 60 days ahead. `classCode` must be one of 1A, 2A, 3A, 3E, SL, CC, EC or 2S; without it, the first preferred class the train has is checked.
+- **Calls:** with `withFares` (the default), the train's fares are looked up too, so at most two calls are made.
+- **Access:** identity, origin, key and passcode work as for a search.
+- **Responses:**
+  - `{ status: ok, classCode, offer, fares }`, where the offer carries a `calendar` of the next six days.
+  - `{ status: blocked, state }` without the key or passcode.
+  - `{ status: failed, problem, message }` when irctc.dev fails, for example `rate_limited` beyond 10 seat checks a minute.
+  - 400 for invalid input, which never reaches irctc.dev.
 
 ## Query planning
 

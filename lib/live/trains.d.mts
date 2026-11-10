@@ -1,4 +1,4 @@
-import type { LiveProblem, PlannedQuery, SearchPlan, Service } from '../model';
+import type { Fare, LiveProblem, Offer, PlannedQuery, SearchPlan, Service } from '../model';
 import type { Fetcher } from './irctc-dev.mjs';
 
 export type LiveAccess = 'allowed' | 'not_configured' | 'passcode_required' | 'passcode_rejected';
@@ -10,3 +10,6 @@ export interface LiveTrainRun { services: Service[]; outcomes: Map<string, Query
 export function liveAccess(config: { key?: string; passcode?: string }, provided: string | null): LiveAccess;
 export function selectTrainQueries(plan: SearchPlan, limits?: LiveTrainLimits): PlannedQuery[];
 export function runLiveTrains(plan: SearchPlan, options: { key: string; baseUrl?: string; fetcher?: Fetcher; now?: () => number; limits?: LiveTrainLimits }): Promise<LiveTrainRun>;
+export const SEAT_CLASSES: readonly string[];
+export interface SeatCheck { classCode?: string; offer?: Offer | null; fares?: Fare[]; problem?: LiveProblem; }
+export function checkTrainSeats(options: { key: string; baseUrl?: string; fetcher?: Fetcher; now?: () => number; limits?: LiveTrainLimits }, request: { trainNo: string; from: string; to: string; date: string; classCode?: string; withFares?: boolean }): Promise<SeatCheck>;

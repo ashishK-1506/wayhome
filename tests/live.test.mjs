@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildSearchPlan } from '../lib/planner.mjs';
 import { evaluateJourneys, validateService, safeBookingUrl } from '../lib/engine.mjs';
-import { dmy, istIso, parseAvailability, parseFares, parseTrains, runsOn, syncedTime, trainOffer, trainService } from '../lib/live/irctc-dev.mjs';
+import { dmy, fareList, istIso, parseAvailability, parseCalendar, parseFares, parseTrains, runsOn, syncedTime, trainOffer, trainService } from '../lib/live/irctc-dev.mjs';
 import { LIVE_TRAIN_LIMITS, liveAccess, runLiveTrains, selectTrainQueries } from '../lib/live/trains.mjs';
 import { fakeIrctcDev, trainRecord, trainsFor } from './fixtures/irctc-dev.mjs';
 
@@ -50,6 +50,12 @@ test('seat availability maps to offer states without inventing capacity', () => 
   assert.equal(parseAvailability({ availability: [{ date: '2026-11-21', status: 'AVAILABLE-0001' }] }, day), null);
   assert.equal(parseAvailability({}, day), null);
   assert.deepEqual([...parseFares({ fares: [{ class: '3A', totalFare: 1650.4 }, { class: 'SL', totalFare: -1 }, { class: 2, totalFare: 5 }, null] })], [['3A', 1650]]);
+  assert.deepEqual(fareList(new Map([['3A', 1650], ['SL', 620], ['2A', 2490]])).map(f => f.classCode), ['SL', '3A', '2A']);
+  // The days after the travel date, in order, at most six by default.
+  const calendar = { availability: ['22', '20', '21', '23', '24', '25', '26', '27', '28'].map(d => ({ date: `2026-11-${d}`, status: d === '21' ? 'GNWL5/WL2' : 'AVAILABLE-0010', type: d === '21' ? 'WAITLIST' : 'AVAILABLE' })).concat([{ date: 'bad' }, null]) };
+  assert.deepEqual(parseCalendar(calendar, day).map(d => d.date.slice(8)), ['21', '22', '23', '24', '25', '26']);
+  assert.deepEqual(parseCalendar(calendar, day)[0], { date: '2026-11-21', status: 'waitlist', statusText: 'GNWL5/WL2' });
+  assert.deepEqual(parseCalendar(calendar, day, 2)[1], { date: '2026-11-22', status: 'available', seats: 10, statusText: 'AVAILABLE-0010' });
 });
 
 test('converted trains and offers are valid engine input with correct dates and check times', () => {
@@ -118,6 +124,10 @@ test('live trains become journeys with seats, and each planned query records wha
   const direct = live.services.find(s => s.number === '90001');
   assert.deepEqual(direct.offers.map(o => [o.classCode, o.status, o.seats, o.amount]), [['3A', 'available', 12, 1650], ['SL', 'available', 140, 620]]);
   assert(direct.offers.every(o => o.checkedAt === istIso(Date.parse(synced))));
+  // Every class the train has comes with its fare, and each check carries the following days.
+  assert.deepEqual(direct.fares, [{ classCode: 'SL', amount: 620 }, { classCode: '3A', amount: 1650 }, { classCode: '2A', amount: 2490 }]);
+  assert(direct.offers.every(o => o.calendar?.length === 1 && o.calendar[0].status === 'available' && o.calendar[0].seats === 99));
+  assert.equal(live.services.find(s => s.number === '90005').fares, undefined);
   assert.deepEqual(live.services.find(s => s.number === '90002').offers.map(o => [o.status, o.statusText]), [['waitlist', 'GNWL20/WL8'], ['rac', 'RAC12/RAC3']]);
   // The onward search runs for the travel day and the next, so the intercity appears twice; only the
   // one that connects with the feeder is checked.

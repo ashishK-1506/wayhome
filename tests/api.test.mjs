@@ -21,6 +21,7 @@ const providers=await loadTs('lib/provider-status.ts');
 const rewrites={'@/lib/api-guard':guard,'@/lib/provider-status':providers,'@/lib/connectors':connectorsWith({status:'binding_unavailable'}),'@/lib/planner.mjs':new URL('../lib/planner.mjs',import.meta.url).href,'@/lib/engine.mjs':new URL('../lib/engine.mjs',import.meta.url).href,'@/lib/live/trains.mjs':new URL('../lib/live/trains.mjs',import.meta.url).href};
 const {POST}=await import(await loadTs('app/api/search/route.ts',rewrites));
 const {GET}=await import(await loadTs('app/api/capabilities/route.ts',rewrites));
+const {POST:checkSeats}=await import(await loadTs('app/api/seats/route.ts',{...rewrites,'@/lib/catalog.mjs':new URL('../lib/catalog.mjs',import.meta.url).href}));
 const base='https://wayhome.test';
 const date=new Date(Date.now()+86400000).toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});
 const query={originId:'gurugram',destinationId:'jamalpur',date,passengers:1,modes:['train','flight','bus','carpool'],depth:'extended',flexibility:0,budget:null,maxHours:72,availabilityOnly:true};
@@ -108,4 +109,40 @@ test('the local dev server runs live trains without the passcode; a deployed sit
     data=await (await POST(at('http://localhost:5173',{'oai-authenticated-user-id':'test-visitor'}))).json();
     assert.equal(data.live.state,'passcode_required');
   }finally{globalThis.fetch=realFetch;process.env.NODE_ENV='production';delete process.env.IRCTC_DEV_API_KEY;delete process.env.WAYHOME_LIVE_PASSCODE;}
+});
+const seatRequest=(body,extra={})=>new Request(base+'/api/seats',{method:'POST',headers:{'oai-authenticated-user-id':'test-visitor',Origin:base,'Content-Type':'application/json',...extra},body:JSON.stringify(body)});
+test('a seat check needs the key and passcode, checks its input, and returns the class with fares and next days',async()=>{
+  const seat={trainNo:'90001',from:'NDLS',to:'JMP',date,classCode:'3A'},pass={'x-wayhome-passcode':'open sesame'};
+  let data=await (await checkSeats(seatRequest(seat))).json();
+  assert.equal(data.status,'blocked');assert.equal(data.state,'not_configured');
+  process.env.IRCTC_DEV_API_KEY='test-key';process.env.WAYHOME_LIVE_PASSCODE='open sesame';
+  const realFetch=globalThis.fetch,log=[];globalThis.fetch=fakeIrctcDev({log});
+  try{
+    data=await (await checkSeats(seatRequest(seat))).json();assert.equal(data.state,'passcode_required');
+    for(const bad of [{...seat,trainNo:'123'},{...seat,from:'XXXX'},{...seat,to:'NDLS'},{...seat,date:'2020-01-01'},{...seat,classCode:'ZZ'}])assert.equal((await checkSeats(seatRequest(bad,pass))).status,400);
+    assert.equal(log.length,0); // nothing invalid reaches irctc.dev
+    const response=await checkSeats(seatRequest(seat,pass));
+    assert.equal(response.status,200);assert.match(response.headers.get('cache-control'),/private.*no-store/);
+    data=await response.json();
+    assert.equal(data.status,'ok');
+    assert.deepEqual([data.offer.classCode,data.offer.status,data.offer.seats,data.offer.amount],['3A','available',12,1650]);
+    assert.deepEqual(data.fares.map(f=>f.classCode),['SL','3A','2A']);
+    assert.deepEqual(data.offer.calendar.map(d=>[d.status,d.seats]),[['available',99]]);
+    assert.equal(log.length,2);
+    // A card that already shows the fares asks for seats only: one call.
+    log.length=0;data=await (await checkSeats(seatRequest({...seat,classCode:'SL',withFares:false},pass))).json();
+    assert.equal(data.offer.classCode,'SL');assert.equal(data.fares,null);assert.equal(log.length,1);
+    // Without a class it picks the train's own: a chair-car intercity is checked in CC.
+    data=await (await checkSeats(seatRequest({trainNo:'90006',from:'PNBE',to:'JMP',date},pass))).json();
+    assert.equal(data.classCode,'CC');assert.equal(data.offer.status,'available');
+  }finally{globalThis.fetch=realFetch;delete process.env.IRCTC_DEV_API_KEY;delete process.env.WAYHOME_LIVE_PASSCODE;}
+});
+test('a refused seat check says why and still returns the fares',async()=>{
+  process.env.IRCTC_DEV_API_KEY='test-key';
+  const realFetch=globalThis.fetch;globalThis.fetch=fakeIrctcDev({seatLimit:0});
+  try{
+    const data=await (await checkSeats(seatRequest({trainNo:'90001',from:'NDLS',to:'JMP',date,classCode:'3A'}))).json();
+    assert.equal(data.status,'failed');assert.equal(data.problem,'rate_limited');assert.match(data.message,/10 seat checks a minute/);
+    assert.deepEqual(data.fares.map(f=>f.classCode),['SL','3A','2A']);
+  }finally{globalThis.fetch=realFetch;delete process.env.IRCTC_DEV_API_KEY;}
 });
