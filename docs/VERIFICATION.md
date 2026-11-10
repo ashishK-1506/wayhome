@@ -252,6 +252,18 @@ Checks run:
 - TypeScript and lint passed.
 - The owner's exact search on the dev server, with no passcode, returned `status: live`: New Delhi → Jamalpur, 9 November, all modes. 9 train searches succeeded and found 60 journeys. None had seats on every leg, because the checked trains were waitlisted. The other planned queries stay `not_attempted` by design: flights, buses and carpools are not live, and a search runs at most 11 train searches.
 
+## Clearer statuses for searches that did not run — 10 November 2026
+
+The owner saw `not_attempted` on most queries of a working live search and took it for a failure. A New Delhi → Jamalpur search for 11 November had 9 train searches succeed and found 102 journeys. Its other 111 queries were labelled `not_attempted`, whether they were train searches left out to save requests or flight, bus and carpool searches with no live source.
+
+In a live search, these now say which: `skipped` and `no_live_source`, counted in `sourceQueries.skipped` and `sourceQueries.noLiveSource`. The message, the page summary and the plan table name both. `not_attempted` now appears only when no live search ran at all.
+
+Checks run:
+
+- `npm test`: 55 passed. The API test now checks that a live run leaves nothing `not_attempted`, that only train searches are `skipped`, that every other source is `no_live_source`, and the counts.
+- TypeScript and lint passed.
+- The owner's exact request returned `status: live` with 9 `succeeded`, 88 `skipped` and 23 `no_live_source`, and the message "9 train searches ran. 88 other train searches were skipped to save requests, and 23 flight, bus and carpool searches have no live source yet."
+
 ## Release boundary
 
 The new Site was created owner-private. Publication uses the private deployment operation, which verifies the owner-only audience, without changing sharing. Production publication evidence belongs to the returned Sites deployment record. No authenticated hosted travel-app read has been attempted or passed. Enabling live results requires the remaining integration gates in IMPLEMENTATION.md.

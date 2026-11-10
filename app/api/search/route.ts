@@ -47,11 +47,16 @@ export async function POST(request: Request) {
       const live=await runLiveTrains(plan,{key,baseUrl:process.env.IRCTC_DEV_BASE_URL?.trim()||undefined});
       // Failed calls by reason, for the server log only (no key, no user details).
       if(live.calls.failed)console.warn('irctc.dev calls failed',{made:live.calls.made,failed:live.calls.failed,reasons:live.failures});
-      const queries=plan.queries.map(q=>{const outcome=live.outcomes.get(q.id);return outcome?{...q,...outcome,source:'irctc.dev'}:q;});
+      // Every planned query says what happened to it: it ran (succeeded or failed), it is a train
+      // search left out to save requests (skipped), or there is no live source for it yet.
+      const queries=plan.queries.map(q=>{const outcome=live.outcomes.get(q.id);return outcome?{...q,...outcome,source:'irctc.dev'}:{...q,status:q.provider==='confirmtkt'?'skipped' as const:'no_live_source' as const};});
       const attempted=live.outcomes.size,succeeded=[...live.outcomes.values()].filter(o=>o.status==='succeeded').length;
+      const skipped=queries.filter(q=>q.status==='skipped').length,noLiveSource=queries.filter(q=>q.status==='no_live_source').length;
+      const ran=`Live trains checked with irctc.dev, an unofficial source: ${attempted} train ${attempted===1?'search':'searches'} ran.`;
+      const notRun=[skipped&&`${skipped} other train ${skipped===1?'search was':'searches were'} skipped to save requests`,noLiveSource&&`${noLiveSource} flight, bus and carpool ${noLiveSource===1?'search has':'searches have'} no live source yet`].filter(Boolean).join(', and ');
       const result=evaluateJourneys(live.services,plan.query,[],Date.now(),plan.limits.maxCandidates);
       const info:LiveInfo={state:'ran',source:'irctc.dev',calls:live.calls,failures:live.failures,trainsChecked:live.trainsChecked,classes:live.classes,problem:live.problem};
-      const run:SearchRun={status:'live',plan:{...plan,queries},providers,result,sourceQueries:{planned:plan.queries.length,attempted,succeeded,failed:attempted-succeeded,notAttempted:plan.queries.length-attempted},completedAt:new Date().toISOString(),coverage:attempted===plan.queries.length&&succeeded===attempted?'complete':'partial',message:live.problem?LIVE_FAILED[live.problem]:`Live trains checked with irctc.dev, an unofficial source: ${attempted} of ${plan.queries.length} planned searches ran. Flights, buses and carpools are not live yet.`,live:info};
+      const run:SearchRun={status:'live',plan:{...plan,queries},providers,result,sourceQueries:{planned:plan.queries.length,attempted,succeeded,failed:attempted-succeeded,notAttempted:plan.queries.length-attempted,skipped,noLiveSource},completedAt:new Date().toISOString(),coverage:attempted===plan.queries.length&&succeeded===attempted?'complete':'partial',message:live.problem?LIVE_FAILED[live.problem]:notRun?`${ran} ${notRun[0].toUpperCase()}${notRun.slice(1)}.`:ran,live:info};
       return Response.json(run,{headers:PRIVATE_HEADERS});
     }
     // No live read ran. Empty input is a blocked search, never a successful "no tickets" result.

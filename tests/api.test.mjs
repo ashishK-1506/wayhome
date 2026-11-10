@@ -71,8 +71,14 @@ test('live trains need the passcode when one is set, and run with it',async()=>{
     data=await response.json();
     assert.equal(data.status,'live');assert.equal(data.live.state,'ran');assert.equal(data.live.source,'irctc.dev');assert.equal(data.coverage,'partial');
     assert(data.sourceQueries.attempted>0&&data.sourceQueries.attempted<=11&&data.sourceQueries.succeeded===data.sourceQueries.attempted);
-    const ran=data.plan.queries.filter(q=>q.status!=='not_attempted');
+    // In a live run every planned query says what happened to it; none is left as not_attempted.
+    assert(!data.plan.queries.some(q=>q.status==='not_attempted'));
+    const ran=data.plan.queries.filter(q=>q.status==='succeeded'||q.status==='failed');
     assert.equal(ran.length,data.sourceQueries.attempted);assert(ran.every(q=>q.status==='succeeded'&&q.source==='irctc.dev'));
+    assert(data.plan.queries.filter(q=>q.status==='skipped').every(q=>q.provider==='confirmtkt'));
+    assert(data.plan.queries.filter(q=>q.provider!=='confirmtkt').every(q=>q.status==='no_live_source'));
+    assert.equal(data.sourceQueries.skipped+data.sourceQueries.noLiveSource,data.sourceQueries.notAttempted);
+    assert.match(data.message,/skipped to save requests, and \d+ flight, bus and carpool searches have no live source yet\.$/);
     assert(data.result.journeys.some(j=>j.offersOnAllLegs));
     assert(!JSON.stringify(data).includes('test-key'));
   }finally{globalThis.fetch=realFetch;delete process.env.IRCTC_DEV_API_KEY;delete process.env.WAYHOME_LIVE_PASSCODE;}

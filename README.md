@@ -47,6 +47,7 @@ What a live search does:
 - **Calls.** That is up to 25 calls, four at a time, each limited to 8 seconds and the whole search to 20.
 - **Labels.** Each offer names its source and links to the ConfirmTkt search for that route and date. Its check time is when irctc.dev last refreshed the answer, which can be several minutes old because irctc.dev caches.
 - **Availability.** As with any source, a train counts as available only with a seat count from the last two minutes. Waitlist, RAC and closed bookings are shown with irctc.dev's own codes, such as `GNWL12/WL5` or `REGRET` ("booking closed").
+- **What did not run.** Each planned query says what happened to it: `succeeded` or `failed` if it ran, `skipped` for a train search left out to save requests, and `no_live_source` for flights, buses and carpools. `not_attempted` appears only when no live search ran at all.
 - **No caching.** Nothing is cached here: irctc.dev's terms allow caching only for performance, not to reduce usage.
 - **Failures.** If irctc.dev rejects the key, runs out of quota, refuses checks over its per-minute limit or does not answer, the search still returns its plan, with the reason.
 
